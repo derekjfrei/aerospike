@@ -7,36 +7,8 @@ import (
 	as "github.com/aerospike/aerospike-client-go/v6"
 )
 
-func main() {
-	// Connect to the Aerospike server
-	client, err := as.NewClient("localhost", 3000)
-	if err != nil {
-		log.Fatal(err)
-	}
-	defer client.Close()
-
-	// Test connection with a simple write/read
-	log.Println("Testing connection...")
-	testKey, err := as.NewKey("test", "demo", "test-key")
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	err = client.Put(nil, testKey, as.BinMap{
-		"test": "value",
-	})
-	if err != nil {
-		log.Fatalf("Failed to write test record: %v", err)
-	}
-
-	record, err := client.Get(nil, testKey)
-	if err != nil {
-		log.Fatalf("Failed to read test record: %v", err)
-	}
-	log.Printf("Successfully connected to Aerospike. Test record: %v\n", record.Bins)
-
-	// Now let's demonstrate some Aerospike features...
-	// 1. TTL (Time-To-Live) Feature
+// implement the functions in the features map below
+func demonstrateTTL(client *as.Client) {
 	log.Println("\n=== TTL Feature ===")
 	ttlKey, _ := as.NewKey("test", "demo", "ttl-demo")
 
@@ -46,7 +18,7 @@ func main() {
 		"timestamp": time.Now().String(),
 	}
 	writePolicy := as.NewWritePolicy(0, 5) // 5 second TTL
-	err = client.Put(writePolicy, ttlKey, ttlBins)
+	err := client.Put(writePolicy, ttlKey, ttlBins)
 	if err != nil {
 		log.Printf("Error writing TTL record: %v\n", err)
 		return
@@ -65,8 +37,9 @@ func main() {
 	} else {
 		log.Printf("Unexpected: Record still exists: %v\n", record.Bins)
 	}
+}
 
-	// 2. Batch Operations
+func demonstrateBatchOperations(client *as.Client) {
 	log.Println("\n=== Batch Operations ===")
 	keys := make([]*as.Key, 3)
 	for i := 0; i < 3; i++ {
@@ -90,13 +63,14 @@ func main() {
 	for i, record := range records {
 		log.Printf("Batch record %d: %v\n", i, record.Bins)
 	}
+}
 
-	// 3. List Operations
+func demonstrateListOperations(client *as.Client) {
 	log.Println("\n=== List Operations ===")
 	listKey, _ := as.NewKey("test", "demo", "list-demo")
 
 	listBin := as.NewBin("numbers", []interface{}{1, 2, 3})
-	err = client.PutBins(nil, listKey, listBin)
+	err := client.PutBins(nil, listKey, listBin)
 	if err != nil {
 		log.Printf("Error creating list: %v\n", err)
 		return
@@ -114,7 +88,9 @@ func main() {
 	if record, err := client.Get(nil, listKey); err == nil {
 		log.Printf("Final list: %v\n", record.Bins["numbers"])
 	}
+}
 
+func demonstrateSecondaryIndex(client *as.Client) {
 	// 4. Secondary Index and Query
 	log.Println("\n=== Secondary Index and Query ===")
 
