@@ -1,0 +1,174 @@
+package main
+
+import (
+	"log"
+	"time"
+
+	as "github.com/aerospike/aerospike-client-go/v6"
+)
+
+func main() {
+	// Connect to the Aerospike server
+	client, err := as.NewClient("localhost", 3000)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer client.Close()
+
+	// Test connection with a simple write/read
+	log.Println("Testing connection...")
+	testKey, err := as.NewKey("test", "demo", "test-key")
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	err = client.Put(nil, testKey, as.BinMap{
+		"test": "value",
+	})
+	if err != nil {
+		log.Fatalf("Failed to write test record: %v", err)
+	}
+
+	record, err := client.Get(nil, testKey)
+	if err != nil {
+		log.Fatalf("Failed to read test record: %v", err)
+	}
+	log.Printf("Successfully connected to Aerospike. Test record: %v\n", record.Bins)
+
+	// Now let's demonstrate some Aerospike features...
+	// 1. TTL (Time-To-Live) Feature
+	log.Println("\n=== TTL Feature ===")
+	ttlKey, _ := as.NewKey("test", "demo", "ttl-demo")
+
+	// Write record with 5 second TTL
+	ttlBins := as.BinMap{
+		"name":      "temporary-data",
+		"timestamp": time.Now().String(),
+	}
+	writePolicy := as.NewWritePolicy(0, 5) // 5 second TTL
+	err = client.Put(writePolicy, ttlKey, ttlBins)
+	if err != nil {
+		log.Printf("Error writing TTL record: %v\n", err)
+		return
+	}
+	log.Println("Written record with 5 second TTL")
+
+	// Read immediately
+	if record, err := client.Get(nil, ttlKey); err == nil {
+		log.Printf("Record exists: %v\n", record.Bins)
+	}
+
+	// Wait 6 seconds and try to read again
+	time.Sleep(6 * time.Second)
+	if record, err := client.Get(nil, ttlKey); err != nil {
+		log.Printf("Record expired as expected: %v\n", err)
+	} else {
+		log.Printf("Unexpected: Record still exists: %v\n", record.Bins)
+	}
+
+	// 2. Batch Operations
+	log.Println("\n=== Batch Operations ===")
+	keys := make([]*as.Key, 3)
+	for i := 0; i < 3; i++ {
+		keys[i], _ = as.NewKey("test", "demo", i)
+		bins := as.BinMap{
+			"id":   i,
+			"data": "batch-data-" + string(rune('A'+i)),
+		}
+		if err := client.Put(nil, keys[i], bins); err != nil {
+			log.Printf("Error writing batch record %d: %v\n", i, err)
+			return
+		}
+	}
+
+	records, err := client.BatchGet(nil, keys)
+	if err != nil {
+		log.Printf("Error in batch get: %v\n", err)
+		return
+	}
+
+	for i, record := range records {
+		log.Printf("Batch record %d: %v\n", i, record.Bins)
+	}
+
+	// 3. List Operations
+	log.Println("\n=== List Operations ===")
+	listKey, _ := as.NewKey("test", "demo", "list-demo")
+
+	listBin := as.NewBin("numbers", []interface{}{1, 2, 3})
+	err = client.PutBins(nil, listKey, listBin)
+	if err != nil {
+		log.Printf("Error creating list: %v\n", err)
+		return
+	}
+
+	ops := []*as.Operation{
+		as.ListAppendOp("numbers", 4),
+	}
+	_, err = client.Operate(nil, listKey, ops...)
+	if err != nil {
+		log.Printf("Error appending to list: %v\n", err)
+		return
+	}
+
+	if record, err := client.Get(nil, listKey); err == nil {
+		log.Printf("Final list: %v\n", record.Bins["numbers"])
+	}
+
+	// 4. Secondary Index and Query
+	log.Println("\n=== Secondary Index and Query ===")
+
+	// Create a secondary index
+	task, err := client.CreateIndex(nil, "test", "demo", "age_index", "age", as.NUMERIC)
+	if err != nil {
+		log.Printf("Error creating index: %v\n", err)
+		// Continue anyway as the index might already exist
+	}
+
+	if task != nil {
+		// Wait for index creation
+		for {
+			done, err := task.IsDone()
+			if err != nil {
+				log.Printf("Error checking index status: %v\n", err)
+				break
+			}
+			if done {
+				break
+			}
+			time.Sleep(100 * time.Millisecond)
+		}
+	}
+
+	// Insert some records
+	for i := 20; i < 30; i++ {
+		key, _ := as.NewKey("test", "demo", "user-"+string(rune('0'+i-20)))
+		bins := as.BinMap{
+			"name": "user-" + string(rune('A'+i-20)),
+			"age":  i,
+		}
+		if err := client.Put(nil, key, bins); err != nil {
+			log.Printf("Error inserting record: %v\n", err)
+			return
+		}
+	}
+
+	// Query records where age > 25
+	stmt := as.NewStatement("test", "demo")
+	stmt.SetFilter(as.NewRangeFilter("age", 25, 100))
+
+	recordset, err := client.Query(nil, stmt)
+	if err != nil {
+		log.Printf("Error querying: %v\n", err)
+		return
+	}
+
+	// Process query results
+	for res := range recordset.Results() {
+		if res.Err != nil {
+			log.Printf("Error in result: %v\n", res.Err)
+			continue
+		}
+		log.Printf("Query result: %v\n", res.Record.Bins)
+	}
+}

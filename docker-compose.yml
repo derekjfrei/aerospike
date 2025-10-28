@@ -8,9 +8,7 @@ services:
       - "3002:3002"
     volumes:
       - aerospike_data:/opt/aerospike/data
-    environment:
-      - NAMESPACE=test
-      - MEM_GB=1
+      - ./aerospike.conf:/etc/aerospike/aerospike.conf
     healthcheck:
       test: ["CMD-SHELL", "asinfo -v status"]
       interval: 30s
