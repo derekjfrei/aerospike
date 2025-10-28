@@ -16,7 +16,6 @@ func main() {
 
 	// Create a map of features to demonstrate
 	features := map[string]func(*as.Client){
-		"TTL":               demonstrateTTL,
 		"Batch Operations":  demonstrateBatchOperations,
 		"List Operations":   demonstrateListOperations,
 		"Secondary Index":   demonstrateSecondaryIndex,

@@ -7,38 +7,6 @@ import (
 	as "github.com/aerospike/aerospike-client-go/v6"
 )
 
-// implement the functions in the features map below
-func demonstrateTTL(client *as.Client) {
-	log.Println("\n=== TTL Feature ===")
-	ttlKey, _ := as.NewKey("test", "demo", "ttl-demo")
-
-	// Write record with 5 second TTL
-	ttlBins := as.BinMap{
-		"name":      "temporary-data",
-		"timestamp": time.Now().String(),
-	}
-	writePolicy := as.NewWritePolicy(0, 5) // 5 second TTL
-	err := client.Put(writePolicy, ttlKey, ttlBins)
-	if err != nil {
-		log.Printf("Error writing TTL record: %v\n", err)
-		return
-	}
-	log.Println("Written record with 5 second TTL")
-
-	// Read immediately
-	if record, err := client.Get(nil, ttlKey); err == nil {
-		log.Printf("Record exists: %v\n", record.Bins)
-	}
-
-	// Wait 6 seconds and try to read again
-	time.Sleep(6 * time.Second)
-	if record, err := client.Get(nil, ttlKey); err != nil {
-		log.Printf("Record expired as expected: %v\n", err)
-	} else {
-		log.Printf("Unexpected: Record still exists: %v\n", record.Bins)
-	}
-}
-
 func demonstrateBatchOperations(client *as.Client) {
 	log.Println("\n=== Batch Operations ===")
 	keys := make([]*as.Key, 3)
